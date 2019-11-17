@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom";
 import cn from "classnames";
 import { normalize, schema } from "normalizr";
-import { produce, original } from "immer";
+import produce, { original } from "immer";
 
 import "./index.pcss";
 
