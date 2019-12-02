@@ -5,7 +5,7 @@ const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 module.exports = {
   entry: {
     exampleWithReact: "./example-with-react",
-    exampleWithMiniReact: "./example-with-minireact",
+    exampleWithMiniReact: "./example-with-mini-react",
   },
   output: {
     path: path.resolve(__dirname, "dist"),
@@ -26,9 +26,14 @@ module.exports = {
       exclude: [
         path.resolve(__dirname, "node_modules"),
       ],
-      use: [
+      use: [ 
         "style-loader",
-        "css-loader",
+        {
+          loader: "css-loader",
+          options: {
+            importLoaders: 1,
+          },
+        },
         "postcss-loader",
       ]
     }]
@@ -43,11 +48,12 @@ module.exports = {
     }),
     new HtmlWebpackPlugin({
       title: "ExampleWithReact",
-      filename: "public/example-with-minireact.html",
+      filename: "public/example-with-mini-react.html",
       chunks: ["exampleWithMiniReact"],
       template: "./public/index.html",
     }),
   ],
+  devtool: "cheap-module-source-map",
   devServer: {
     contentBase: path.join(__dirname, 'dist'),
     port: 3002,
