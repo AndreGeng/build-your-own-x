@@ -63,7 +63,9 @@ class App extends React.Component {
     return (
       <section className="app">
         <h1>TODOS</h1>
-        {this.renderList()}
+        <ul>
+          {this.renderList()}
+        </ul>
       </section>
     )
   }
