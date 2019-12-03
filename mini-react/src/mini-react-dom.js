@@ -1,26 +1,26 @@
 const isListener = name => name.startsWith("on");
 const isAttribute = name => !isListener(name) && name !== "children";
-const render = (component, container) => {
-  if (!component) {
-    throw new Error("component not exist!");
+const render = (element, container) => {
+  if (!element) {
+    throw new Error("element not exist!");
   }
   if (!container) {
     throw new Error("container not exist!");
   }
   // 文本元素
-  if (!component.type) {
-    const textNode = document.createTextNode(component);
+  if (!element.type) {
+    const textNode = document.createTextNode(element);
     container.appendChild(textNode);
     return;
   }
-  const props = component.props || {};
+  const props = element.props || {};
   let children = props.children;
   if (!children) {
     children = [];
   } else if (typeof children === "string") {
     children = [children];
   }
-  const node = document.createElement(component.type);
+  const node = document.createElement(element.type);
   // 添加properties
   Object.keys(props)
     .filter(isAttribute)
@@ -44,5 +44,8 @@ const render = (component, container) => {
 }
 
 export default {
-  render,
+  render: (element, container) => {
+    container.innerHTML = '';
+    render(element, container);
+  },
 }
