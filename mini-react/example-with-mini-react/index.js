@@ -2,46 +2,84 @@
 import MiniReact from "../src/mini-react";
 import MiniReactDOM from "../src/mini-react-dom";
 import cn from "classnames";
+import PropTypes from "prop-types";
 import "./index.pcss"
 
 const todos = [{
-	id: 1,
-	txt: "起床",
-	done: true,
+  id: 1,
+  txt: "起床",
+  done: true,
 }, {
-	id: 2,
-	txt: "洗漱",
-	done: false,
+  id: 2,
+  txt: "洗漱",
+  done: false,
 }, {
-	id: 3,
-	txt: "打酱油",
-	done: false,
+  id: 3,
+  txt: "打酱油",
+  done: false,
 }]
-const renderTodoItem = (item, index) => {
-  return (
-    <li className={cn("item", {"item--done": item.done})} onClick={(e) => {
-      e.preventDefault();
-      toggleTodo(item.id);
-    }}>
-      <input id={index} type="checkbox" checked={item.done} />
-      <label htmlFor={index}>{item.txt}</label>
-    </li>
-  )
+class TodoItem extends MiniReact.Component {
+  render() {
+    const {
+      done,
+      id,
+      txt,
+      onChange,
+    } = this.props;
+    return (
+      <li className={cn("item", { "item--done": done })}>
+        <input onChange={ () => onChange(id) } id={ id } type="checkbox" checked={ done } /><label htmlFor={id}>{txt}</label>
+      </li>
+    )
+  }
 }
-const getApp = (todos) => {
-  return (
-    <section>
-      <h1>TODOS</h1>
-      <ul>
-        {todos.map(renderTodoItem)}
-      </ul>
-    </section>
-  )
+TodoItem.propTypes = {
+  done: PropTypes.boolean,
+  id: PropTypes.string,
+  txt: PropTypes.string,
+  onChange: PropTypes.func,
 }
-const toggleTodo = (id) => {
-  const item = todos.filter(todo => todo.id === id)[0]
-  item.done = !item.done;
-  MiniReactDOM.render(getApp(todos), document.getElementById("root"));
+class App extends MiniReact.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      todos,
+    };
+    this.renderTodoItem = this.renderTodoItem.bind(this);
+    this.toggleTodo = this.toggleTodo.bind(this);
+  }
+  renderTodoItem (item) {
+    return (
+      <TodoItem 
+        {...item}
+        onChange={this.toggleTodo}
+      />
+    )
+  }
+  toggleTodo(id) {
+    const { todos } = this.state;
+    const newTodos = todos.map(todo => {
+      if (todo.id === id) {
+        return Object.assign({}, todo, {
+          done: !todo.done,
+        });
+      }
+      return todo;
+    });
+    this.setState({
+      todos: newTodos,
+    })
+  }
+  render() {
+    return (
+      <section>
+        <h1>TODOS</h1>
+        <ul>
+        {this.state.todos.map(this.renderTodoItem)}
+        </ul>
+      </section>
+    )
+  }
 }
 
-MiniReactDOM.render(getApp(todos), document.getElementById("root"));
+MiniReactDOM.render(<App />, document.getElementById("root"));

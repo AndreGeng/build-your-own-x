@@ -36,13 +36,23 @@ const reconcileChildren = (preInstance, newInstance) => {
   return newChildrenInstances;
 }
 /**
+ * 创建与Component相关的publicInstance
+ * @param {MiniReactElement} element
+ */
+const createPublicInstance = (element, internalInstance) => {
+  const { type, props } = element;
+  const publicInstance = new type(props);
+  publicInstance.__internalInstance = internalInstance;
+  return publicInstance;
+}
+/**
  * 对比新老instance，完成dom树的更新
  * @param {HTMLElement} container
  * @param {Instance} preInstance
  * @param {MiniReactElement} element
  * @return {Instance} newInstance
  */
-const reconcile = (container, preInstance, element) => {
+export const reconcile = (container, preInstance, element) => {
   // 旧的节点需要删除
   if (!element) {
     container.removeChild(preInstance.dom);
@@ -60,17 +70,23 @@ const reconcile = (container, preInstance, element) => {
     container.replaceChild(preInstance.dom, newInstance.dom);
     return newInstance;
   } 
-  const newInstance = {
-    element,
-  };
-  if (preInstance.element.type === element.type) {
+  if (typeof preInstance.element.type === "function") {
+    preInstance.publicInstance.props = element.props;
+    const childElement = preInstance.publicInstance.render();
+    const childInstance = reconcile(container, preInstance.childInstance, childElement);
+    Object.assign(preInstance, { childInstance, })
+    return preInstance;
+  } else {
+    const newInstance = {
+      element,
+    };
     // 类型一致，复用节点
     newInstance.dom = preInstance.dom;
     updateDomProperties(preInstance.dom, preInstance.element.props, element.props);
+    // 递归生成childrenInstance
+    newInstance.childInstances = reconcileChildren(preInstance, newInstance);
+    return newInstance;
   } 
-	// 递归生成childrenInstance
-  newInstance.childInstances = reconcileChildren(preInstance, newInstance);
-  return newInstance;
 }
 /**
  * 更新dom节点
@@ -126,6 +142,17 @@ const updateDomProperties = (dom, preProps, props) => {
 * @return {Instance}
 */
 const instatiate = (element) => {
+  if (typeof element.type === "function") {
+    // 组件
+    const newInstance = {
+      element,
+    };
+    const publicInstance = createPublicInstance(element, newInstance);
+    const childElement = publicInstance.render();
+    const childInstance = instatiate(childElement);
+    Object.assign(newInstance, { dom: childInstance.dom, childInstance, publicInstance });
+    return newInstance;
+  }
   if (!element) {
     throw new Error("element not exist!");
   }
