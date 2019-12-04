@@ -3,6 +3,7 @@ import ReactDOM from "react-dom";
 import cn from "classnames";
 import { normalize, schema } from "normalizr";
 import produce, { original } from "immer";
+import PropTypes from "prop-types";
 
 import "./index.pcss";
 
@@ -34,6 +35,12 @@ class TodoItem extends React.Component {
     )
   }
 }
+TodoItem.propTypes = {
+  done: PropTypes.boolean,
+  id: PropTypes.string,
+  txt: PropTypes.string,
+  onChange: PropTypes.func,
+}
 class App extends React.Component {
   constructor(props) {
     super(props);
@@ -56,7 +63,7 @@ class App extends React.Component {
     const { todos } = this.state;
     return todos.allIds.map(id => {
       const item = todos.byId[id];
-      return <TodoItem { ...item } onChange={this.onItemStatusChange} />;
+      return <TodoItem key={item.id} { ...item } onChange={this.onItemStatusChange} />;
     })
   }
   render() {
