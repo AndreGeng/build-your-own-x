@@ -1,8 +1,10 @@
+const isListener = name => name.startsWith("on");
+const isAttribute = name => !isListener(name) && name !== "children";
 /**
 * @typedef {Object} Instance
 * @property {MiniReactElement} element
 * @property {HTMLElement} dom
-* @property {Instance[]} childrenInstances
+* @property {Instance[]} childInstances
 * instance是MiniReactElement渲染到dom后的一种表示
 */
 let rootInstance = null;
@@ -13,6 +15,25 @@ let rootInstance = null;
 const render = (element, container) => {
 		const preRootInstance = rootInstance;
 		rootInstance = reconcile(container, preRootInstance, element);
+}
+
+/**
+ * 递归调用reconcile生成childInstances 
+ * @param {Instance} preInstance
+ * @param {MiniReactElement} element
+ * @return {Instance[]}
+ */
+const reconcileChildren = (preInstance, newInstance) => {
+  const element = newInstance.element;
+  const count = Math.max((preInstance && preInstance.childInstances.length) || 0, (element.props && element.props.children.length) || 0);
+  const newChildrenInstances = [];
+  for (let i = 0; i < count; i++) {
+    const preChildInstance = (preInstance && preInstance.childInstances[i]) || null;
+    const child = element.props && element.props.children[i];
+    const childInstance = reconcile(newInstance.dom, preChildInstance, child);
+    newChildrenInstances.push(childInstance);
+  }
+  return newChildrenInstances;
 }
 /**
  * 对比新老instance，完成dom树的更新
@@ -27,36 +48,30 @@ const reconcile = (container, preInstance, element) => {
     container.removeChild(preInstance.dom);
     return null;
   }
-	let newInstance = {
-		element,
-	};
   if (!preInstance) {
 		// 新增节点
-		newInstance.dom = instatiate(element);
+		const newInstance = instatiate(element);
     container.appendChild(newInstance.dom);
-  } else if (preInstance.element.type === element.type) {
+    return newInstance;
+  } 
+  if (preInstance.element.type !== element.type) {
+    // 类型不一致，替换节点
+    const newInstance = instatiate(element);
+    container.replaceChild(preInstance.dom, newInstance.dom);
+    return newInstance;
+  } 
+  const newInstance = {
+    element,
+  };
+  if (preInstance.element.type === element.type) {
     // 类型一致，复用节点
     newInstance.dom = preInstance.dom;
     updateDomProperties(preInstance.dom, preInstance.element.props, element.props);
-  } else {
-    // 类型不一致，替换节点
-    newInstance.dom = instatiate(element);
-    container.replaceChild(preInstance.dom, newInstance.dom);
   } 
 	// 递归生成childrenInstance
-  const count = Math.max((preInstance && preInstance.childrenInstances.length) || 0, (element.props && element.props.children.length) || 0);
-  const newChildrenInstances = [];
-  for (let i = 0; i < count; i++) {
-    const preChildInstance = (preInstance && preInstance.childrenInstances[i]) || null;
-    const child = element.props && element.props.children[i];
-    const childInstance = reconcile(newInstance.dom, preChildInstance, child);
-    newChildrenInstances.push(childInstance);
-  }
-  newInstance.childrenInstances = newChildrenInstances;
+  newInstance.childInstances = reconcileChildren(preInstance, newInstance);
   return newInstance;
 }
-const isListener = name => name.startsWith("on");
-const isAttribute = name => !isListener(name) && name !== "children";
 /**
  * 更新dom节点
  * @param {HTMLElement} dom
@@ -108,16 +123,21 @@ const updateDomProperties = (dom, preProps, props) => {
 /**
 * 返回instance对象
 * @param {MiniReactElement} element
-* @return {HTMLElement} container
+* @return {Instance}
 */
 const instatiate = (element) => {
   if (!element) {
     throw new Error("element not exist!");
   }
+  const instance = {
+    element,
+  };
   // 文本元素
   if (!element.type) {
     const textNode = document.createTextNode(element);
-    return textNode;
+    instance.dom = textNode;
+    instance.childInstances = [];
+    return instance;
   }
   const props = element.props || {};
   let children = props.children;
@@ -128,7 +148,12 @@ const instatiate = (element) => {
   }
   const node = document.createElement(element.type);
   updateDomProperties(node, [], props);
-  return node;
+  instance.dom = node;
+  const childInstances = children.map(instatiate);
+  const childDoms = childInstances.map(instance => instance.dom);
+  childDoms.forEach(dom => node.appendChild(dom));
+  instance.childInstances = childInstances;
+  return instance;
 }
 
 export default {
