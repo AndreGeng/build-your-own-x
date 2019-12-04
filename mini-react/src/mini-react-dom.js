@@ -38,6 +38,10 @@ const reconcile = (container, preInstance, element) => {
     // 类型一致，复用节点
     newInstance.dom = preInstance.dom;
     updateDomProperties(preInstance.dom, preInstance.element.props, element.props);
+  } else {
+    // 类型不一致，替换节点
+    newInstance.dom = instatiate(element);
+    container.replaceChild(preInstance.dom, newInstance.dom);
   } 
 	// 递归生成childrenInstance
   const count = Math.max((preInstance && preInstance.childrenInstances.length) || 0, (element.props && element.props.children.length) || 0);
