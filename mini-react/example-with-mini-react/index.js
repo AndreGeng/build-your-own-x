@@ -18,20 +18,12 @@ const todos = [{
   txt: "打酱油",
   done: false,
 }]
-class TodoItem extends MiniReact.Component {
-  render() {
-    const {
-      done,
-      id,
-      txt,
-      onChange,
-    } = this.props;
-    return (
-      <li className={cn("item", { "item--done": done })}>
-        <input onChange={ () => onChange(id) } id={ id } type="checkbox" checked={ done } /><label htmlFor={id}>{txt}</label>
-      </li>
-    )
-  }
+const TodoItem = ({ done, id, txt, onChange }) => {
+  return (
+    <li className={cn("item", { "item--done": done })}>
+      <input onChange={ () => onChange(id) } id={ id } type="checkbox" checked={ done } /><label htmlFor={id}>{txt}</label>
+    </li>
+  )
 }
 TodoItem.propTypes = {
   done: PropTypes.boolean,

@@ -71,8 +71,15 @@ export const reconcile = (container, preInstance, element) => {
     return newInstance;
   } 
   if (typeof preInstance.element.type === "function") {
-    preInstance.publicInstance.props = element.props;
-    const childElement = preInstance.publicInstance.render();
+    let childElement;
+    if (typeof element.type.prototype.render === "function") {
+      // 组件
+      preInstance.publicInstance.props = element.props;
+      childElement = preInstance.publicInstance.render();
+    } else {
+      // 函数组件
+      childElement = element.type(element.props);
+    }
     const childInstance = reconcile(container, preInstance.childInstance, childElement);
     Object.assign(preInstance, { childInstance, })
     return preInstance;
@@ -142,16 +149,23 @@ const updateDomProperties = (dom, preProps, props) => {
 * @return {Instance}
 */
 const instatiate = (element) => {
-  if (typeof element.type === "function") {
-    // 组件
+  let { type, props } = element;
+  if (typeof type === "function") {
     const newInstance = {
       element,
     };
-    const publicInstance = createPublicInstance(element, newInstance);
-    const childElement = publicInstance.render();
-    const childInstance = instatiate(childElement);
-    Object.assign(newInstance, { dom: childInstance.dom, childInstance, publicInstance });
-    return newInstance;
+    if (typeof type.prototype.render === "function") {
+      // 组件
+      const publicInstance = createPublicInstance(element, newInstance);
+      const childElement = publicInstance.render();
+      const childInstance = instatiate(childElement);
+      Object.assign(newInstance, { dom: childInstance.dom, childInstance, publicInstance });
+      return newInstance;
+    }
+    const childElement = type(props);
+		const childInstance = instatiate(childElement);
+    Object.assign(newInstance, { childInstance, dom: childInstance.dom });
+		return newInstance;
   }
   if (!element) {
     throw new Error("element not exist!");
@@ -166,7 +180,7 @@ const instatiate = (element) => {
     instance.childInstances = [];
     return instance;
   }
-  const props = element.props || {};
+  props = props || {};
   let children = props.children;
   if (!children) {
     children = [];
