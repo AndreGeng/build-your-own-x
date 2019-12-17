@@ -1,99 +1,23 @@
+import MiniReact from "./mini-react";
+import { TYPE, EFFECT_TAG } from "./constant";
+
 const isListener = name => name.startsWith("on");
 const isAttribute = name => !isListener(name) && name !== "children";
-/**
-* @typedef {Object} Instance
-* @property {MiniReactElement} element
-* @property {HTMLElement} dom
-* @property {Instance[]} childInstances
-* instance是MiniReactElement渲染到dom后的一种表示
-*/
-let rootInstance = null;
+
 /**
 * @param {MiniReactElement} element
 * @param {HTMLElement} container 
 */
 const render = (element, container) => {
-		const preRootInstance = rootInstance;
-		rootInstance = reconcile(container, preRootInstance, element);
-}
-
-/**
- * 递归调用reconcile生成childInstances 
- * @param {Instance} preInstance
- * @param {MiniReactElement} element
- * @return {Instance[]}
- */
-const reconcileChildren = (preInstance, newInstance) => {
-  const element = newInstance.element;
-  const count = Math.max((preInstance && preInstance.childInstances.length) || 0, (element.props && element.props.children.length) || 0);
-  const newChildrenInstances = [];
-  for (let i = 0; i < count; i++) {
-    const preChildInstance = (preInstance && preInstance.childInstances[i]) || null;
-    const child = element.props && element.props.children[i];
-    const childInstance = reconcile(newInstance.dom, preChildInstance, child);
-    newChildrenInstances.push(childInstance);
+  // hostroot
+  MiniReact.wipRoot = {
+    dom: container,
+    props: {
+      children: [element],
+    },
+    alternate: MiniReact.currentRoot,
   }
-  return newChildrenInstances;
-}
-/**
- * 创建与Component相关的publicInstance
- * @param {MiniReactElement} element
- */
-const createPublicInstance = (element, internalInstance) => {
-  const { type, props } = element;
-  const publicInstance = new type(props);
-  publicInstance.__internalInstance = internalInstance;
-  return publicInstance;
-}
-/**
- * 对比新老instance，完成dom树的更新
- * @param {HTMLElement} container
- * @param {Instance} preInstance
- * @param {MiniReactElement} element
- * @return {Instance} newInstance
- */
-export const reconcile = (container, preInstance, element) => {
-  // 旧的节点需要删除
-  if (!element) {
-    container.removeChild(preInstance.dom);
-    return null;
-  }
-  if (!preInstance) {
-		// 新增节点
-		const newInstance = instatiate(element);
-    container.appendChild(newInstance.dom);
-    return newInstance;
-  } 
-  if (preInstance.element.type !== element.type) {
-    // 类型不一致，替换节点
-    const newInstance = instatiate(element);
-    container.replaceChild(preInstance.dom, newInstance.dom);
-    return newInstance;
-  } 
-  if (typeof preInstance.element.type === "function") {
-    let childElement;
-    if (typeof element.type.prototype.render === "function") {
-      // 组件
-      preInstance.publicInstance.props = element.props;
-      childElement = preInstance.publicInstance.render();
-    } else {
-      // 函数组件
-      childElement = element.type(element.props);
-    }
-    const childInstance = reconcile(container, preInstance.childInstance, childElement);
-    Object.assign(preInstance, { childInstance, })
-    return preInstance;
-  } else {
-    const newInstance = {
-      element,
-    };
-    // 类型一致，复用节点
-    newInstance.dom = preInstance.dom;
-    updateDomProperties(preInstance.dom, preInstance.element.props, element.props);
-    // 递归生成childrenInstance
-    newInstance.childInstances = reconcileChildren(preInstance, newInstance);
-    return newInstance;
-  } 
+  window.requestIdleCallback(MiniReact.workLoop);
 }
 /**
  * 更新dom节点
@@ -143,58 +67,68 @@ const updateDomProperties = (dom, preProps, props) => {
       dom.addEventListener(eventType, props[name]);
     });
 }
+
 /**
-* 返回instance对象
-* @param {MiniReactElement} element
-* @return {Instance}
-*/
-const instatiate = (element) => {
-  let { type, props } = element;
-  if (typeof type === "function") {
-    const newInstance = {
-      element,
-    };
-    if (typeof type.prototype.render === "function") {
-      // 组件
-      const publicInstance = createPublicInstance(element, newInstance);
-      const childElement = publicInstance.render();
-      const childInstance = instatiate(childElement);
-      Object.assign(newInstance, { dom: childInstance.dom, childInstance, publicInstance });
-      return newInstance;
-    }
-    const childElement = type(props);
-		const childInstance = instatiate(childElement);
-    Object.assign(newInstance, { childInstance, dom: childInstance.dom });
-		return newInstance;
+ * 把fiber转换为dom节点
+ * @param {Fiber} fiber
+ * @return {HTMLElement}
+ */
+const createDOM = (fiber) => {
+  if (!fiber) {
+    throw new Error("fiber not exist!");
   }
-  if (!element) {
-    throw new Error("element not exist!");
-  }
-  const instance = {
-    element,
-  };
+  const { type, props } = fiber;
+  let node;
   // 文本元素
-  if (!element.type) {
-    const textNode = document.createTextNode(element);
-    instance.dom = textNode;
-    instance.childInstances = [];
-    return instance;
+  if (fiber.type === TYPE.TEXT_ELEMENT) {
+    node = document.createTextNode("");
+  } else {
+    node = document.createElement(type);
   }
-  props = props || {};
-  let children = props.children;
-  if (!children) {
-    children = [];
-  } else if (typeof children === "string") {
-    children = [children];
-  }
-  const node = document.createElement(element.type);
   updateDomProperties(node, [], props);
-  instance.dom = node;
-  const childInstances = children.map(instatiate);
-  const childDoms = childInstances.map(instance => instance.dom);
-  childDoms.forEach(dom => node.appendChild(dom));
-  instance.childInstances = childInstances;
-  return instance;
+  return node;
+}
+
+
+/**
+ * 把workingInProgress tree渲染进dom
+ */
+const commitRoot = (deletionList) => {
+  commitWork(MiniReact.wipRoot.child);
+  if (deletionList) {
+    deletionList.forEach(fiber => {
+      fiber.dom.parentNode.removeChild(fiber.dom);
+    });
+  }
+  MiniReact.currentRoot = MiniReact.wipRoot;
+  MiniReact.wipRoot = null;
+}
+window.commitRoot = commitRoot;
+
+/**
+ * 把workingInProgress fiber tree渲染进dom
+ */
+const commitWork = (fiber) => {
+  if (!fiber) {
+    return;
+  }
+  let parent = fiber.return;
+  if (!parent.dom) {
+    parent = parent.return;
+  }
+  const parentDom = parent.dom;
+  if (typeof fiber.type === "string" && !fiber.dom) {
+    fiber.dom = createDOM(fiber);
+  }
+  if (fiber.effectTag === EFFECT_TAG.NEW && fiber.dom !== null) {
+    parentDom.appendChild(fiber.dom);
+  } else if (fiber.effectTag === EFFECT_TAG.UPDATE && fiber.dom !== null) {
+    updateDomProperties(fiber.alternate.dom, fiber.alternate.props, fiber.props);
+  }
+  delete fiber.effectTag;
+  delete fiber.alternate;
+  commitWork(fiber.child);
+  commitWork(fiber.sibling);
 }
 
 export default {
