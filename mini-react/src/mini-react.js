@@ -3,6 +3,9 @@ import { TYPE, EFFECT_TAG } from "./constant";
 let wipRoot = null;
 let currentRoot = null;
 let deletionList = [];
+let wipFiber = null;
+let hooksIdx = 0;
+const taskQueue = [];
 
 const flattenArray = (arr) => {
   if (!arr && arr.length <= 0) {
@@ -21,7 +24,7 @@ const flattenArray = (arr) => {
 const createElement = (type, config, ...children) => {
   const props = Object.assign({}, config, {
     children: flattenArray(children).map(child => {
-      if (typeof child === "string") {
+      if (typeof child === "string" || typeof child === "number") {
         return {
           type: TYPE.TEXT_ELEMENT,
           props: {
@@ -39,14 +42,22 @@ const createElement = (type, config, ...children) => {
   }
 }
 
-const workLoop = (idleDeadline) => {
-  let nextUnitWork = wipRoot;
+const workLoop = (nextUnitWork) => (idleDeadline) => {
+  if (!nextUnitWork && taskQueue.length > 0) {
+    if (wipRoot) {
+      return;
+    }
+    wipRoot = taskQueue.shift();
+    wipRoot.alternate = currentRoot;
+    wipRoot.props = currentRoot.props;
+    nextUnitWork = wipRoot;
+  }
   while (nextUnitWork && (idleDeadline.timeRemaining() > 1 || idleDeadline.didTimeout)) {
     nextUnitWork = performUnitWork(nextUnitWork);
   }
   if (nextUnitWork) {
-    window.requestIdleCallback(workLoop);
-  } else {
+    window.requestIdleCallback(workLoop(nextUnitWork));
+  } else if (wipRoot) {
     window.commitRoot && window.commitRoot(deletionList);
   }
 }
@@ -65,6 +76,7 @@ const reconcileChildren = (wipFiber) => {
         return: wipFiber,
         alternate: oldFiber,
         dom: null,
+        hooks: [],
       };
       // 新增节点
       if (!oldFiber) {
@@ -111,6 +123,8 @@ const performUnitWork = (fiber) => {
         fiber.props.children = [fiber.alternate.publicInstance.render()];
       }
     } else {
+      wipFiber = fiber;
+      hooksIdx = 0;
       fiber.props.children = [fiber.type(fiber.props)]
     }
     reconcileChildren(fiber);
@@ -144,16 +158,40 @@ class Component {
       partialState = v(this.state);
     }
     this.state = Object.assign({}, this.state, partialState);
-    wipRoot = {
+    taskQueue.push({
       dom: currentRoot.dom,
-      props: currentRoot.props,
-      alternate: currentRoot,
-    }
-    window.requestIdleCallback(workLoop);
+    })
+    window.requestIdleCallback(workLoop());
   }
   render() {
     return null;
   }
+}
+
+export const useState = (initV) => {
+  const oldHook = wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hooksIdx];
+  const hook = {
+    state: oldHook ? oldHook.state : initV,
+    queue: [],
+  };
+  wipFiber.hooks.push(hook);
+  hooksIdx++;
+  const actions = oldHook ? oldHook.queue : [];
+  actions.forEach(action => {
+    hook.state = typeof action === "function" ? action(hook.state) : action;
+  });
+  const setState = (newV) => {
+    hook.queue.push(newV);
+    taskQueue.push({
+      dom: currentRoot.dom,
+    })
+    if (!wipRoot) {
+      window.requestIdleCallback(workLoop());
+    }
+  }
+  return [hook.state, setState];
 }
 
 export default {
@@ -172,4 +210,5 @@ export default {
   set wipRoot(value) {
     wipRoot = value;
   },
+  taskQueue,
 }

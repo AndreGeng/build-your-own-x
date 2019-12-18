@@ -17,7 +17,7 @@ const render = (element, container) => {
     },
     alternate: MiniReact.currentRoot,
   }
-  window.requestIdleCallback(MiniReact.workLoop);
+  window.requestIdleCallback(MiniReact.workLoop(MiniReact.wipRoot));
 }
 /**
  * 更新dom节点
@@ -101,7 +101,13 @@ const commitRoot = (deletionList) => {
     });
   }
   MiniReact.currentRoot = MiniReact.wipRoot;
-  MiniReact.wipRoot = null;
+  MiniReact.currentRoot.alternate = null;
+  setTimeout(() => {
+    MiniReact.wipRoot = null;
+    if (MiniReact.taskQueue.length > 0) {
+      window.requestIdleCallback(MiniReact.workLoop());
+    }
+  }, 0)
 }
 window.commitRoot = commitRoot;
 
@@ -123,10 +129,8 @@ const commitWork = (fiber) => {
   if (fiber.effectTag === EFFECT_TAG.NEW && fiber.dom !== null) {
     parentDom.appendChild(fiber.dom);
   } else if (fiber.effectTag === EFFECT_TAG.UPDATE && fiber.dom !== null) {
-    updateDomProperties(fiber.alternate.dom, fiber.alternate.props, fiber.props);
+    updateDomProperties(fiber.dom, fiber.alternate.props, fiber.props);
   }
-  delete fiber.effectTag;
-  delete fiber.alternate;
   commitWork(fiber.child);
   commitWork(fiber.sibling);
 }
