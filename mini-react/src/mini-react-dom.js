@@ -93,47 +93,37 @@ const createDOM = (fiber) => {
 /**
  * 把workingInProgress tree渲染进dom
  */
-const commitRoot = (deletionList) => {
-  commitWork(MiniReact.wipRoot.child);
-  if (deletionList) {
-    deletionList.forEach(fiber => {
-      fiber.dom.parentNode.removeChild(fiber.dom);
-    });
-  }
+const commitRoot = (effectList) => {
+  effectList.forEach(fiber => {
+    switch(fiber.effectTag) {
+      case EFFECT_TAG.NEW: {
+        if (typeof fiber.type === "string" && !fiber.dom) {
+          fiber.dom = createDOM(fiber);
+        }
+        let parent = fiber.return;
+        if (!parent.dom) {
+          parent = parent.return;
+        }
+        const parentDom = parent.dom;
+        if (fiber.dom) {
+          parentDom.appendChild(fiber.dom);
+        }
+        break;
+      }
+      case EFFECT_TAG.DELETE:
+        fiber.dom.parentNode.removeChild(fiber.dom);
+        break;
+      case EFFECT_TAG.UPDATE:
+        if (fiber.dom) {
+          updateDomProperties(fiber.dom, fiber.alternate.props, fiber.props);
+        }
+        break;
+    }
+  })
   MiniReact.currentRoot = MiniReact.wipRoot;
   MiniReact.currentRoot.alternate = null;
-  setTimeout(() => {
-    MiniReact.wipRoot = null;
-    if (MiniReact.taskQueue.length > 0) {
-      window.requestIdleCallback(MiniReact.workLoop());
-    }
-  }, 0)
 }
 window.commitRoot = commitRoot;
-
-/**
- * 把workingInProgress fiber tree渲染进dom
- */
-const commitWork = (fiber) => {
-  if (!fiber) {
-    return;
-  }
-  let parent = fiber.return;
-  if (!parent.dom) {
-    parent = parent.return;
-  }
-  const parentDom = parent.dom;
-  if (typeof fiber.type === "string" && !fiber.dom) {
-    fiber.dom = createDOM(fiber);
-  }
-  if (fiber.effectTag === EFFECT_TAG.NEW && fiber.dom !== null) {
-    parentDom.appendChild(fiber.dom);
-  } else if (fiber.effectTag === EFFECT_TAG.UPDATE && fiber.dom !== null) {
-    updateDomProperties(fiber.dom, fiber.alternate.props, fiber.props);
-  }
-  commitWork(fiber.child);
-  commitWork(fiber.sibling);
-}
 
 export default {
   render,

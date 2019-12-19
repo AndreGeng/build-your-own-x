@@ -2,10 +2,9 @@ import { TYPE, EFFECT_TAG } from "./constant";
 
 let wipRoot = null;
 let currentRoot = null;
-let deletionList = [];
+let effectList = [];
 let wipFiber = null;
 let hooksIdx = 0;
-const taskQueue = [];
 
 const flattenArray = (arr) => {
   if (!arr && arr.length <= 0) {
@@ -43,13 +42,7 @@ const createElement = (type, config, ...children) => {
 }
 
 const workLoop = (nextUnitWork) => (idleDeadline) => {
-  if (!nextUnitWork && taskQueue.length > 0) {
-    if (wipRoot) {
-      return;
-    }
-    wipRoot = taskQueue.shift();
-    wipRoot.alternate = currentRoot;
-    wipRoot.props = currentRoot.props;
+  if (!nextUnitWork) {
     nextUnitWork = wipRoot;
   }
   while (nextUnitWork && (idleDeadline.timeRemaining() > 1 || idleDeadline.didTimeout)) {
@@ -58,8 +51,13 @@ const workLoop = (nextUnitWork) => (idleDeadline) => {
   if (nextUnitWork) {
     window.requestIdleCallback(workLoop(nextUnitWork));
   } else if (wipRoot) {
-    window.commitRoot && window.commitRoot(deletionList);
+    window.commitRoot && window.commitRoot(effectList);
+    effectList = [];
   }
+}
+
+const getKeys = (obj) => {
+  return Object.keys(obj).filter((key) => key !== "children");
 }
 
 const reconcileChildren = (wipFiber) => {
@@ -81,13 +79,20 @@ const reconcileChildren = (wipFiber) => {
       // 新增节点
       if (!oldFiber) {
         newFiber.effectTag = EFFECT_TAG.NEW;
+        effectList.push(newFiber);
       }else if (oldFiber.type !== newFiber.type) {
         newFiber.alternate = null;
-        deletionList.push(oldFiber);
+        oldFiber.effectTag = EFFECT_TAG.DELETE;
+        effectList.push(oldFiber);
       } else if (oldFiber.type === newFiber.type) {
         newFiber.dom = oldFiber.dom;
         newFiber.publicInstance = oldFiber.publicInstance;
-        newFiber.effectTag = EFFECT_TAG.UPDATE;
+        const changeNeeded = Array.from(new Set([...getKeys(newFiber.props), ...getKeys(oldFiber.props)]))
+          .some(key => newFiber.props[key] !== oldFiber.props[key])
+        if (changeNeeded) {
+          newFiber.effectTag = EFFECT_TAG.UPDATE;
+          effectList.push(newFiber);
+        }
       }
       if (!wipFiber.child) {
         wipFiber.child = newFiber;
@@ -99,7 +104,8 @@ const reconcileChildren = (wipFiber) => {
       index++;
     } else {
       // 需删除节点
-      deletionList.push(oldFiber);
+      oldFiber.effectTag = EFFECT_TAG.DELETE;
+      effectList.push(oldFiber);
     }
     if (oldFiber) {
       oldFiber = oldFiber.sibling || null;
@@ -158,9 +164,11 @@ class Component {
       partialState = v(this.state);
     }
     this.state = Object.assign({}, this.state, partialState);
-    taskQueue.push({
+    wipRoot = {
       dom: currentRoot.dom,
-    })
+      alternate: currentRoot,
+      props: currentRoot.props,
+    }
     window.requestIdleCallback(workLoop());
   }
   render() {
@@ -182,16 +190,44 @@ export const useState = (initV) => {
   actions.forEach(action => {
     hook.state = typeof action === "function" ? action(hook.state) : action;
   });
+  !window.hooks && (window.hooks = []);
+  window.hooks.push(hook);
   const setState = (newV) => {
     hook.queue.push(newV);
-    taskQueue.push({
+    wipRoot = {
       dom: currentRoot.dom,
-    })
-    if (!wipRoot) {
-      window.requestIdleCallback(workLoop());
+      alternate: currentRoot,
+      props: currentRoot.props,
     }
+    window.requestIdleCallback(workLoop());
   }
   return [hook.state, setState];
+}
+
+export const useCallback = (cb, deps) => {
+  const oldHook = wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hooksIdx];
+  const depsNotChange = (oldDeps, newDeps) => {
+    if (oldDeps.length !== newDeps.length) {
+      return false;
+    }
+    let i = 0;
+    while (i < newDeps.length) {
+      if (newDeps[i] !== oldDeps[i]) {
+        return false;
+      }
+      i++;
+    }
+    return true;
+  }
+  const hook = {
+    state: oldHook && depsNotChange(oldHook.deps, deps) ? oldHook.state : cb,
+    deps,
+  };
+  wipFiber.hooks.push(hook);
+  hooksIdx++;
+  return hook.state;
 }
 
 export default {
@@ -210,5 +246,4 @@ export default {
   set wipRoot(value) {
     wipRoot = value;
   },
-  taskQueue,
 }
