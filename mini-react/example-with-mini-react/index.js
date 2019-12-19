@@ -1,5 +1,5 @@
 /** @jsx MiniReact.createElement */
-import MiniReact, { useState } from "../src/mini-react";
+import MiniReact, { useState, useCallback } from "../src/mini-react";
 import MiniReactDOM from "../src/mini-react-dom";
 import cn from "classnames";
 import PropTypes from "prop-types";
@@ -18,10 +18,19 @@ const todoList = [{
   txt: "打酱油",
   done: false,
 }]
+// let i = 4;
+// while (i < 10000) {
+//   todoList.push({
+//     id: i,
+//     txt: i,
+//     done: false,
+//   });
+//   i++;
+// }
 const TodoItem = ({ done, id, txt, onChange }) => {
   return (
     <li className={cn("item", { "item--done": done })}>
-      <input onChange={ () => onChange(id) } id={ id } type="checkbox" checked={ done } /><label htmlFor={id}>{txt}</label>
+      <input onChange={() => onChange(id)} id={ id } type="checkbox" checked={ done } /><label htmlFor={id}>{txt}</label>
     </li>
   )
 }
@@ -42,7 +51,7 @@ const App = () => {
       />
     )
   };
-  const toggleTodo = (id) => {
+  const toggleTodo = useCallback((id) => {
     setTodos((todos) => {
       const newTodos = todos.map(todo => {
         if (todo.id === id) {
@@ -55,7 +64,7 @@ const App = () => {
       return newTodos;
     });
     setCount(count => count + 1);
-  }
+  }, [todos, count])
   return (
     <section>
       <h1>TODOS</h1>

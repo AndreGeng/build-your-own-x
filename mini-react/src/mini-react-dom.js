@@ -17,7 +17,8 @@ const render = (element, container) => {
     },
     alternate: MiniReact.currentRoot,
   }
-  window.requestIdleCallback(MiniReact.workLoop(MiniReact.wipRoot));
+  MiniReact.nextUnitWork = MiniReact.wipRoot;
+  window.requestIdleCallback(MiniReact.workLoop);
 }
 /**
  * 更新dom节点
@@ -122,6 +123,8 @@ const commitRoot = (effectList) => {
   })
   MiniReact.currentRoot = MiniReact.wipRoot;
   MiniReact.currentRoot.alternate = null;
+  MiniReact.wipRoot = null;
+  MiniReact.nextUnitWork = null;
 }
 window.commitRoot = commitRoot;
 

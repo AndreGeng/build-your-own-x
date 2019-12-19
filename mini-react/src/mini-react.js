@@ -2,6 +2,7 @@ import { TYPE, EFFECT_TAG } from "./constant";
 
 let wipRoot = null;
 let currentRoot = null;
+let nextUnitWork = null;
 let effectList = [];
 let wipFiber = null;
 let hooksIdx = 0;
@@ -41,15 +42,12 @@ const createElement = (type, config, ...children) => {
   }
 }
 
-const workLoop = (nextUnitWork) => (idleDeadline) => {
-  if (!nextUnitWork) {
-    nextUnitWork = wipRoot;
-  }
+const workLoop = (idleDeadline) => {
   while (nextUnitWork && (idleDeadline.timeRemaining() > 1 || idleDeadline.didTimeout)) {
     nextUnitWork = performUnitWork(nextUnitWork);
   }
   if (nextUnitWork) {
-    window.requestIdleCallback(workLoop(nextUnitWork));
+    window.requestIdleCallback(workLoop);
   } else if (wipRoot) {
     window.commitRoot && window.commitRoot(effectList);
     effectList = [];
@@ -169,7 +167,8 @@ class Component {
       alternate: currentRoot,
       props: currentRoot.props,
     }
-    window.requestIdleCallback(workLoop());
+    nextUnitWork = wipRoot;
+    window.requestIdleCallback(workLoop);
   }
   render() {
     return null;
@@ -190,8 +189,6 @@ export const useState = (initV) => {
   actions.forEach(action => {
     hook.state = typeof action === "function" ? action(hook.state) : action;
   });
-  !window.hooks && (window.hooks = []);
-  window.hooks.push(hook);
   const setState = (newV) => {
     hook.queue.push(newV);
     wipRoot = {
@@ -199,7 +196,8 @@ export const useState = (initV) => {
       alternate: currentRoot,
       props: currentRoot.props,
     }
-    window.requestIdleCallback(workLoop());
+    nextUnitWork = wipRoot;
+    window.requestIdleCallback(workLoop);
   }
   return [hook.state, setState];
 }
@@ -234,6 +232,12 @@ export default {
   createElement,
   Component,
   workLoop,
+  get nextUnitWork() {
+    return nextUnitWork;
+  },
+  set nextUnitWork(value) {
+    nextUnitWork = value;
+  },
   get currentRoot() {
     return currentRoot;
   },
