@@ -131,10 +131,8 @@ const performUnitWork = (fiber) => {
       hooksIdx = 0;
       fiber.props.children = [fiber.type(fiber.props)]
     }
-    reconcileChildren(fiber);
-  } else {
-    reconcileChildren(fiber);
   }
+  reconcileChildren(fiber);
   if (fiber.child) {
     return fiber.child;
   }

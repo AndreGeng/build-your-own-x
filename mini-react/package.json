@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "demo": "webpack-dev-server --open-page 'public/example-with-react.html,public/example-with-mini-react.html'"
+    "start": "webpack-dev-server --open-page 'public/example-with-react.html,public/example-with-mini-react.html'"
   },
   "keywords": [],
   "author": "",
