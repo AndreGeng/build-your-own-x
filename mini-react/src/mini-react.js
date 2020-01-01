@@ -84,7 +84,7 @@ const reconcileChildren = (wipFiber) => {
         effectList.push(oldFiber);
       } else if (oldFiber.type === newFiber.type) {
         newFiber.dom = oldFiber.dom;
-        newFiber.publicInstance = oldFiber.publicInstance;
+        newFiber.stateNode = oldFiber.stateNode;
         const changeNeeded = Array.from(new Set([...getKeys(newFiber.props), ...getKeys(oldFiber.props)]))
           .some(key => newFiber.props[key] !== oldFiber.props[key])
         if (changeNeeded) {
@@ -119,12 +119,12 @@ const performUnitWork = (fiber) => {
   if (typeof fiber.type === "function") {
     if (typeof fiber.type.prototype.render === "function") {
       if (!fiber.alternate) {
-        const publicInstance = new fiber.type(fiber.props);
-        fiber.publicInstance = publicInstance;
-        publicInstance.__internalFiber = fiber;
-        fiber.props.children = [publicInstance.render()];
+        const stateNode = new fiber.type(fiber.props);
+        fiber.stateNode = stateNode;
+        stateNode.__internalFiber = fiber;
+        fiber.props.children = [stateNode.render()];
       } else {
-        fiber.props.children = [fiber.alternate.publicInstance.render()];
+        fiber.props.children = [fiber.alternate.stateNode.render()];
       }
     } else {
       wipFiber = fiber;
