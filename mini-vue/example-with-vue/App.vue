@@ -1,20 +1,23 @@
 <template>
   <div class="app">
     <h1>{{title}}</h1>
-    <TodoForm></TodoForm>
-    <TodoList :todos="todos"></TodoList>
+    <TodoForm @addTodo="addTodo"></TodoForm>
+    <TodoFilter v-model="filter"></TodoFilter>
+    <TodoList :todos="filteredTodos" @toggleTodo="toggleTodo"></TodoList>
   </div>
 </template>
 
 <script>
 import TodoForm from "./components/TodoForm"
 import TodoList from "./components/TodoList"
+import TodoFilter from "./components/TodoFilter"
 
 export default {
   name: "App",
   components: {
     TodoForm,
     TodoList,
+    TodoFilter,
   },
   data() {
     return {
@@ -25,7 +28,34 @@ export default {
       }, {
         txt: "visit parents and children",
         done: false,
-      }]
+      }],
+      filter: "all",
+    }
+  },
+  methods: {
+    toggleTodo(todo) {
+      todo.done = !todo.done
+    },
+    addTodo(txt) {
+      this.todos.unshift({
+        txt,
+        done: false,
+      })
+    }
+  },
+  computed: {
+    filteredTodos() {
+      const filter = this.filter
+      return this.todos.filter((todo) => {
+        switch(filter) {
+          case "all":
+            return true;
+          case "uncompleted":
+            return todo.done === false;
+          case "completed":
+            return todo.done === true;
+        }
+      })
     }
   }
 }

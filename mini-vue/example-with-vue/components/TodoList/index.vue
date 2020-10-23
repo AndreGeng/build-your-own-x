@@ -1,6 +1,6 @@
 <template>
   <div class="todolist">
-    <TodoItem v-for="todo in todos" :todo="todo"></TodoItem>
+    <TodoItem v-for="todo in todos" :todo="todo" @toggle="$emit('toggleTodo', todo)"></TodoItem>
   </div>
 </template>
 
@@ -14,6 +14,6 @@ export default {
   },
   props: {
     todos: Array
-  }
+  },
 }
 </script>

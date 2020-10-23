@@ -1,7 +1,7 @@
 <template>
-  <div class="todoitem">
-    <input type="radio" class="align-center">
+  <div class="todoitem" :class="{done: todo.done}">
     <span class="align-center">{{todo.txt}}</span>
+    <button class="align-center" @click="$emit('toggle')">{{todo.done ? "UnComplete" : "Complete"}}</button>
   </div>
 </template>
 
@@ -25,5 +25,9 @@ export default {
 }
 .align-center {
   vertical-align: middle;
+}
+.done {
+  text-decoration: line-through;
+  color: #cac9c9;
 }
 </style>
