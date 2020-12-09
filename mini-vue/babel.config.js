@@ -1,7 +1,9 @@
 module.exports = api => {
   api.cache.forever();
   const presets = [
-    "@babel/preset-env",
+    ["@babel/preset-env", {
+      shippedProposals: true,
+    }],
   ]
   const plugins = [];
   return {

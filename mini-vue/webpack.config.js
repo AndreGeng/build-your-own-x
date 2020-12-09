@@ -6,6 +6,7 @@ const VueLoaderPlugin = require('vue-loader/lib/plugin')
 module.exports = {
   entry: {
     exampleWithVue: "./example-with-vue",
+    exampleWithMiniVue: "./example-with-mini-vue",
   },
   output: {
     path: path.resolve(__dirname, "dist"),
@@ -63,11 +64,11 @@ module.exports = {
       chunks: ["exampleWithVue"],
       template: "./public/index.html",
     }),
-    // new HtmlWebpackPlugin({
-    //   title: "ExampleWithVue",
-    //   filename: "public/example-with-mini-vue.html",
-    //   chunks: ["exampleWithMiniVue"],
-    //   template: "./public/index.html",
-    // }),
+    new HtmlWebpackPlugin({
+      title: "ExampleWithMiniVue",
+      filename: "public/example-with-mini-vue.html",
+      chunks: ["exampleWithMiniVue"],
+      template: "./public/index.html",
+    }),
   ],
 }

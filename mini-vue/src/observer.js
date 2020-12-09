@@ -1,5 +1,6 @@
 import Dep from "./dep"
 import { arrayMethods } from "./array"
+import { isObject } from "./utils"
 
 function protoArgument(target, src) {
   target.__proto__ = src
@@ -9,7 +10,7 @@ class Observer {
   constructor(value) {
     this.value = value;
     this.dep = new Dep();
-    Object.defineProperty(value, __ob__, {
+    Object.defineProperty(value, "__ob__", {
       value: this,
       enumerable: false,
       writable: true,
@@ -30,13 +31,17 @@ class Observer {
   walk(obj) {
     const keys = Object.keys(obj)
     for (let i=0;i<keys.length;i++) {
-      defineReactive(obj, keys[i], obj[keys[i]])
+      const key = keys[i]
+      defineReactive(obj, key, obj[key])
     }
   }
 }
 
 function observe(value) {
-  if (value.hasOwnProperty('__ob__')) {
+  if (!isObject(value)) {
+    return
+  }
+  if (value.hasOwnProperty("__ob__")) {
     return value.__ob__
   }
   const ob = new Observer(value)
@@ -56,7 +61,7 @@ function dependArray(value) {
 export default observe
 // 把对象上的key转换为reactive的属性
 export function defineReactive(obj, key, val) {
-  const property = obj.getOwnPropertyDescriptor()
+  const property = Object.getOwnPropertyDescriptor(obj, key)
   if (property && property.configurable === false) {
     return
   }
@@ -65,7 +70,7 @@ export function defineReactive(obj, key, val) {
   const setter = property && property.set
   const dep = new Dep()
   
-  const childOb = observe(val)
+  let childOb = observe(val)
   Object.defineProperty(obj, key, {
     enumerable: true,
     configurable: true,
