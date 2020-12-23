@@ -1,7 +1,10 @@
 import { pushTarget, popTarget } from "./dep"
+import { queueWatcher } from "./scheduler"
 
+let uid = 0
 class Watcher {
   constructor(vm, updateCompnent, options) {
+    this.id = uid++
     this.vm = vm
     this.updateCompnent = updateCompnent
     if (options) {
@@ -19,6 +22,7 @@ class Watcher {
     this.newDeps = []
     this.dirty = this.lazy // for lazy watchers
     this.value = this.lazy ? undefined : this.get()
+    this.active = true
   }
   get() {
     const vm = this.vm
@@ -69,6 +73,26 @@ class Watcher {
     let i = this.deps.length
     while (i--) {
       this.deps[i].depend()
+    }
+  }
+  update() {
+    if (this.lazy) {
+      this.dirty = true
+    } else {
+      queueWatcher(this)
+    }
+  }
+  run() {
+    if (this.active) {
+      const value = this.get()
+      if (value !== this.value) {
+        this.value = value
+      }
+    }
+  }
+  teardown() {
+    if (this.active) {
+      this.active = false
     }
   }
 }

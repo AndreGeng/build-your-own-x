@@ -1,6 +1,8 @@
 import { isObject, isUndef, isDef, isPrimitive } from "./utils"
 import modules from "./modules"
 
+let emptyObject = Object.freeze({})
+
 class VNode {
   constructor(tag, data, children, text, elm, context, componentOptions) {
     this.tag = tag
@@ -26,6 +28,20 @@ function createComponentInstanceForVnode (
   return new vnode.componentOptions.Ctor(options)
 }
 
+function updateChildComponent(vm, propsData, listeners, parentVnode, renderChildren) {
+    // update props
+  if (propsData && vm.$options.props) {
+    var props = vm._props;
+    var propKeys = Object.keys(props)
+    for (var i = 0; i < propKeys.length; i++) {
+      var key = propKeys[i];
+      props[key] = propsData[key];
+    }
+    // keep a copy of raw propsData
+    vm.$options.propsData = propsData;
+  }
+}
+
 const componentVNodeHooks = {
   init(vnode) {
     const child = vnode.componentInstance = createComponentInstanceForVnode(
@@ -33,7 +49,18 @@ const componentVNodeHooks = {
       activeInstance,
     )
     child.$mount()
-  }
+  },
+  prepatch(oldVnode, vnode) {
+    let options = vnode.componentOptions;
+    let child = vnode.componentInstance = oldVnode.componentInstance;
+    updateChildComponent(
+      child,
+      options.propsData, // updated props
+      options.listeners, // updated listeners
+      vnode, // new parent vnode
+      options.children // new children
+    );
+  },
 }
 const hooksToMerge = Object.keys(componentVNodeHooks)
 
@@ -95,7 +122,6 @@ export function createComponentVNode(
 }
 function createComponent(
   vnode,
-  insertedVnodeQueue,
   parentElm,
   refElm,
 ) {
@@ -113,10 +139,10 @@ function createComponent(
 function emptyNodeAt (elm) {
   return new VNode(elm.tagName.toLowerCase(), {}, [], undefined, elm)
 }
-function createChildren(vnode, children, insertedVnodeQueue) {
+function createChildren(vnode, children) {
   if (Array.isArray(children)) {
     for (let i=0;i<children.length;i++) {
-      createElm(children[i], insertedVnodeQueue, vnode.elm, null)
+      createElm(children[i], vnode.elm, null)
     }
   } else if (isPrimitive(vnode.text)) {
     const textNode = document.createTextNode(vnode.text)
@@ -156,18 +182,17 @@ function invokeCreateHooks(vnode) {
 
 function createElm (
   vnode,
-  insertedVnodeQueue,
   parentElm,
   refElm,
 ) {
-  if (createComponent(vnode, insertedVnodeQueue, parentElm, refElm)) {
+  if (createComponent(vnode, parentElm, refElm)) {
     return
   }
   const { children, tag } = vnode
   if (isDef(tag)) {
     vnode.elm = document.createElement(tag)
-    createChildren(vnode, children, insertedVnodeQueue)
-    invokeCreateHooks(vnode, insertedVnodeQueue)
+    createChildren(vnode, children)
+    invokeCreateHooks(vnode)
     insert(parentElm, vnode.elm, refElm)
   } else if (vnode.isComment) {
     vnode.elm = document.createComment(vnode.text)
@@ -189,17 +214,124 @@ function sameVnode (a, b) {
   )
 }
 
+function isPatchable (vnode) {
+  while (vnode.componentInstance) {
+    vnode = vnode.componentInstance._vnode
+  }
+  return isDef(vnode.tag)
+}
+function patchVnode(oldVnode, vnode) {
+  if (oldVnode === vnode) {
+    return
+  }
+  const elm = vnode.elm = oldVnode.elm
+  const oldCh = oldVnode.children
+  const ch = vnode.children
+  const data = vnode.data
+  let i
+  if (isDef(data) && isDef(i = data.hook) && isDef(i = i.prepatch)) {
+    i(oldVnode, vnode);
+  }
+  if (isDef(data) && isPatchable(vnode)) {
+    for (i = 0; i < cbs.update.length; ++i) cbs.update[i](oldVnode, vnode)
+  }
+  if (isUndef(vnode.text)) {
+    if (isDef(oldCh) && isDef(ch)) {
+      // updatechildren
+      updateChildren(elm, oldCh, ch)
+    } else if (isDef(ch)) {
+      // addvnodes
+      console.log("addnode needed")
+    } else if (isDef(oldCh)) {
+      // removevnodes
+      console.log("removenode needed")
+    } else if(isDef(oldVnode.text)) {
+      elm.textContent = ""
+    }
+  } else if (oldVnode.text !== vnode.text) {
+    elm.textContent = vnode.text
+  }
+}
+
+function updateChildren(parentElm, oldCh, newCh) {
+  let oldStartIdx = 0
+  let newStartIdx = 0
+  let oldEndIdx = oldCh.length - 1
+  let newEndIdx = newCh.length - 1
+  let oldStartVnode = oldCh[oldStartIdx]
+  let oldEndVnode = oldCh[oldEndIdx]
+  let newStartVnode = newCh[newStartIdx]
+  let newEndVnode = newCh[newEndVnode]
+  let idxInOld
+  while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
+    if (isUndef(oldStartVnode)) {
+      oldStartVnode = oldCh[++oldStartIdx]
+    } else if (isUndef(oldEndVnode)) {
+      oldEndVnode = oldCh[--oldEndIdx]
+    } else if(sameVnode(oldStartVnode, newStartVnode)) {
+      patchVnode(oldStartVnode, newStartVnode)
+      oldStartVnode = oldCh[++oldStartIdx]
+      newStartVnode = newCh[++newStartIdx]
+    } 
+    else if (sameVnode(oldEndVnode, newEndVnode)) {
+      patchVnode(oldEndVnode, newEndVnode)
+      oldEndVnode = oldCh[--oldEndIdx]
+      newEndVnode = newCh[--newEndIdx]
+    } else if (sameVnode(oldStartVnode, newEndVnode)) {
+      patchVnode(oldStartVnode, newEndVnode)
+      parentElm.insertBefore(oldStartVnode.elm, oldEndVnode.elm.nextSibling)
+      oldStartVnode = oldCh[++oldStartVnode]
+      newEndVnode = newCh[--newEndIdx]
+    } else if (sameVnode(oldEndVnode, newStartVnode)) {
+      patchVnode(oldEndVnode, newStartVnode)
+      parentElm.insertBefore(oldEndVnode.elm, oldStartVnode.elm)
+      oldEndVnode = oldCh[--oldEndIdx]
+      newStartVnode = newCh[++newStartVnode]
+    } else {
+      idxInOld = findIdxInOld(newStartVnode, oldCh, oldStartIdx, oldEndIdx)
+      if (isUndef(idxInOld)) {
+        // new node
+        createElm(newStartVnode, parentElm, oldStartVnode.elm)
+      } else {
+        const vnodeToMove = oldCh[idxInOld]
+        patchVnode(vnodeToMove, newStartVnode)
+        oldCh[idxInOld] = undefined
+        parentElm.insertBefore(vnodeToMove.elm, oldStartVnode.elm)
+      }
+      newStartVnode = newCh[++newStartIdx]
+    }
+  }
+  if (oldStartIdx > oldEndIdx) {
+    for (;newStartIdx <= newEndIdx; newStartIdx++) {
+      createElm(newCh[newStartIdx], parentElm, isUndef(newCh[newStartIdx + 1]) ? null: newCh[newStartIdx + 1].elm)
+    }
+  } else if (newStartIdx > newEndIdx) {
+    for (;oldStartIdx <= oldEndIdx; oldStartIdx++) {
+      const oldVnode = oldCh[oldStartIdx]
+      if (oldVnode && oldVnode.elm) {
+        parentElm.removeChild(oldVnode.elm)
+      }
+    }
+  }
+}
+function findIdxInOld (node, oldCh, start, end) {
+  for (let i = start; i < end; i++) {
+    const c = oldCh[i]
+    if (isDef(c) && sameVnode(node, c)) return i
+  }
+}
+
 export function patch (oldVnode, vnode) {
   if (isUndef(vnode)) {
     return
   }
-  let insertedVnodeQueue = [];
   if (isUndef(oldVnode)) {
-    createElm(vnode, insertedVnodeQueue)
+    createElm(vnode)
   } else {
     const isRealElement = isDef(oldVnode.nodeType)
     if (!isRealElement && sameVnode(oldVnode, vnode)) {
       // patch vnode
+      patchVnode(oldVnode, vnode)
     } else {
       if (isRealElement) {
         oldVnode = emptyNodeAt(oldVnode)
@@ -207,7 +339,7 @@ export function patch (oldVnode, vnode) {
       const oldElm = oldVnode.elm
       const parentElm = oldElm.parentNode
       // create new node
-      createElm(vnode, [], parentElm, oldElm.nextSibling)
+      createElm(vnode, parentElm, oldElm.nextSibling)
     }
   }
   return vnode.elm

@@ -1,6 +1,10 @@
+import { remove } from "./utils"
+
+let uid = 0
 class Dep {
   static target;
   constructor() {
+    this.id = ++uid;
     this.subs = [];
   }
   depend() {
@@ -10,6 +14,9 @@ class Dep {
   }
   addSub(sub) {
     this.subs.push(sub)
+  }
+  removeSub (sub) {
+    remove(this.subs, sub)
   }
   notify() {
     const subs = this.subs.slice()

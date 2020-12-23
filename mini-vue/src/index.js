@@ -4,6 +4,7 @@ import VNode, { createComponentVNode, patch, setActiveInstance, createTextVNode,
 import { toString, isPrimitive, } from "./utils"
 import Dep from "./dep"
 import { eventsMixin, initEvent } from "./events"
+import { defineReactive } from "./observer"
 
 class Vue {
   constructor(options) {
@@ -52,13 +53,14 @@ function initMixin(Vue) {
     if (vm.$options._isComponent) {
       if (vm.$options.props) {
         vm.$options.props.propsData = vm.$options._parentVnode.componentOptions.propsData
-        vm.$options._parentListeners = vm.$options._parentVnode.componentOptions.listeners
       }
+      vm.$options._parentListeners = vm.$options._parentVnode.componentOptions.listeners
     }
     initEvent(vm)
     if (vm.$options.props) {
       initProps(vm, vm.$options.props)
     }
+    initMethods(vm, vm.$options.methods)
     if (vm.$options.data) {
       initData(vm)
     }
@@ -78,6 +80,7 @@ function initMixin(Vue) {
     vm._props = props.propsData || {}
     const keys = Object.keys(vm._props)
     keys.forEach((key) => {
+      defineReactive(vm._props, key, props.propsData[key])
       proxy(vm, '_props', key)
     })
   }
@@ -129,6 +132,15 @@ function initMixin(Vue) {
     }
     vm.__patch__ = patch
     vm.$createElement = (...args) => $createElement(vm, ...args)
+    const options = vm.$options;
+    const parentVnode = vm.$vnode = options._parentVnode;
+    const parentData = parentVnode && parentVnode.data;
+  }
+  function initMethods(vm, methods) {
+    const noop = () => {}
+    for (const key in methods) {
+      vm[key] = typeof methods[key] !== "function" ? noop : methods[key].bind(vm)
+    }
   }
   // 把this.key的访问代理到this._data.key
   function proxy(vm, sourceKey, key) {

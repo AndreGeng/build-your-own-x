@@ -44,7 +44,10 @@ function observe(value) {
   if (value.hasOwnProperty("__ob__")) {
     return value.__ob__
   }
-  const ob = new Observer(value)
+  let ob
+  if (Object.isExtensible(value)) {
+    ob = new Observer(value)
+  }
   return ob
 }
 

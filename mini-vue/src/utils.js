@@ -68,9 +68,44 @@ function renderClass (
   dynamicClass,
 ) {
   if (isDef(staticClass) || isDef(dynamicClass)) {
-    return concat(staticClass, dynamicClass)
+    return concat(staticClass, stringifyClass(dynamicClass))
   }
   return ''
+}
+function stringifyClass (value) {
+  if (Array.isArray(value)) {
+    return stringifyArray(value)
+  }
+  if (isObject(value)) {
+    return stringifyObject(value)
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  /* istanbul ignore next */
+  return ''
+}
+function stringifyArray (value) {
+  let res = ''
+  let stringified
+  for (let i = 0, l = value.length; i < l; i++) {
+    if (isDef(stringified = stringifyClass(value[i])) && stringified !== '') {
+      if (res) res += ' '
+      res += stringified
+    }
+  }
+  return res
+}
+
+function stringifyObject (value) {
+  let res = ''
+  for (const key in value) {
+    if (value[key]) {
+      if (res) res += ' '
+      res += key
+    }
+  }
+  return res
 }
 function concat (a, b) {
   return a ? b ? (a + ' ' + b) : a : (b || '')
@@ -86,4 +121,12 @@ export function toArray (list, start) {
     ret[i] = list[i + start]
   }
   return ret
+}
+export function remove (arr, item) {
+  if (arr.length) {
+    const index = arr.indexOf(item)
+    if (index > -1) {
+      return arr.splice(index, 1)
+    }
+  }
 }
