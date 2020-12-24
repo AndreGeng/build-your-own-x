@@ -1,4 +1,4 @@
-import { remove } from "./utils"
+import { remove } from "../utils"
 
 let uid = 0
 class Dep {

@@ -1,6 +1,6 @@
 import Dep from "./dep"
 import { arrayMethods } from "./array"
-import { isObject } from "./utils"
+import { isObject } from "../utils"
 
 function protoArgument(target, src) {
   target.__proto__ = src
